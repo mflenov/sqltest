@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "CyDSqlTest": {
+      "commandName": "Project",
+      "commandLineArgs": "d:\\Projects\\Core\\CyDSqlTest\\test\\ReviewStatus.xml"
+    }
+  }
+}
