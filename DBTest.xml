@@ -1,0 +1,169 @@
+<?xml version="1.0"?>
+<cydsqltest>
+	<configuration>
+		<name>Member status test</name>
+		<connectionString>server=localhost;database=my;Integrated Security=true;</connectionString>
+		<sql><![CDATA[ 
+select 
+	(case 
+		when CurrentFailedAttempts = 3 then 'Last Chance'
+		when CurrentFailedAttempts > 3 then 'Locked'
+		when TotalFailedAttempts > 10 then 'Active Risk'
+		else m.Status end) as MemberState
+from Member m
+	left join (
+		select MemberID, 
+			count(*) TotalFailedAttempts
+		from FailedAttempt 
+		group by MemberID
+	)fa on m.MemberID = fa.MemberID
+	left join (
+		select MemberID, 
+			count(*) CurrentFailedAttempts
+		from FailedAttempt 
+		where ActionDate > dateadd(hour, -1, GetDate())
+		group by MemberID
+	)ca on m.MemberID = fa.MemberID
+where Country = @country
+	and LastName = 'Doe'
+	]]></sql>
+		<parameters>
+			<parameter name="country" type="Varchar">US</parameter>
+			<parameter name="lastname" type="Varchar">Test</parameter>
+		</parameters>
+	</configuration>
+	<init>
+		<sql><![CDATA[ 
+			if (not exists(select * from sys.tables where name = 'Member'))
+				create table Member (
+					MemberID int identity(1,1),
+					FirstName varchar(100),
+					LastName varchar(100),
+					Country varchar(20),
+					City varchar(100),
+					Age int,
+					Status varchar(100)
+				)
+
+			if (not exists(select * from sys.tables where name = 'FailedAttempt'))
+				create table FailedAttempt (
+					FailedAttempt int identity(1,1),
+					MemberID int,
+					ActionDate datetime
+				)
+		]]>
+		</sql>
+	</init>
+	<testcases>
+		<testcase>
+			<name>1. Empty table, should return nothing</name>
+			<sql><![CDATA[ 
+			]]></sql>
+			<asserts>
+				<assert name="rownum" type="Rownum" datatype="Int">1</assert>
+			</asserts>
+		</testcase>
+		<testcase>
+			<name>2. Active with no fails</name>
+			<sql><![CDATA[ 
+				truncate table Member
+				insert into Member (FirstName, LastName, Country, City, Age, Status) values ('John', 'Doe', 'US', 'New York', 123, 'Active')
+			]]></sql>
+			<asserts>
+				<assert name="rownum" type="Rownum" datatype="Int">1</assert>
+				<assert name="value" type="Value" datatype="Varchar">Active</assert>
+			</asserts>
+		</testcase>
+		<testcase>
+			<name>3. This one will fail - that is OK</name>
+			<sql><![CDATA[ 
+				truncate table Member
+				insert into Member (FirstName, LastName, Country, City, Age, Status) values ('John', 'Doe', 'US', 'New York', 123, 'Active')
+			]]></sql>
+			<asserts>
+				<assert name="rownum" type="Rownum" datatype="Int">1</assert>
+				<assert name="value" type="Value" datatype="Varchar">Fail</assert>
+			</asserts>
+		</testcase>
+		<testcase>
+			<name>4. one fail - still Active</name>
+			<sql><![CDATA[ 
+				truncate table Member
+				insert into Member (FirstName, LastName, Country, City, Age, Status) values ('John', 'Doe', 'US', 'New York', 123, 'Active')
+
+				truncate table FailedAttempt
+				insert into FailedAttempt (MemberID, ActionDate) values ((select MemberID from Member where LastName = 'Doe'), GetDate())
+			]]></sql>
+			<asserts>
+				<assert name="rownum" type="Rownum" datatype="Int">1</assert>
+				<assert name="value" type="Value" datatype="Varchar">Active</assert>
+			</asserts>
+		</testcase>
+		<testcase>
+			<name>5. two fails - still Active</name>
+			<sql><![CDATA[ 
+				truncate table Member
+				insert into Member (FirstName, LastName, Country, City, Age, Status) values ('John', 'Doe', 'US', 'New York', 123, 'Active')
+
+				truncate table FailedAttempt
+				insert into FailedAttempt (MemberID, ActionDate) values ((select MemberID from Member where LastName = 'Doe'), GetDate())
+				insert into FailedAttempt (MemberID, ActionDate) values ((select MemberID from Member where LastName = 'Doe'), GetDate())
+			]]></sql>
+			<asserts>
+				<assert name="rownum" type="Rownum" datatype="Int">1</assert>
+				<assert name="value" type="Value" datatype="Varchar">Active</assert>
+			</asserts>
+		</testcase>
+		<testcase>
+			<name>6. Last Chance</name>
+			<sql><![CDATA[ 
+				truncate table Member
+				insert into Member (FirstName, LastName, Country, City, Age, Status) values ('John', 'Doe', 'US', 'New York', 123, 'Active')
+
+				truncate table FailedAttempt
+				insert into FailedAttempt (MemberID, ActionDate) values ((select MemberID from Member where LastName = 'Doe'), GetDate())
+				insert into FailedAttempt (MemberID, ActionDate) values ((select MemberID from Member where LastName = 'Doe'), GetDate())
+				insert into FailedAttempt (MemberID, ActionDate) values ((select MemberID from Member where LastName = 'Doe'), GetDate())
+			]]></sql>
+			<asserts>
+				<assert name="rownum" type="Rownum" datatype="Int">1</assert>
+				<assert name="value" type="Value" datatype="Varchar">Last Chance</assert>
+			</asserts>
+		</testcase>
+		<testcase>
+			<name>6. Four fails - locked</name>
+			<sql><![CDATA[ 
+				truncate table Member
+				insert into Member (FirstName, LastName, Country, City, Age, Status) values ('John', 'Doe', 'US', 'New York', 123, 'Active')
+
+				truncate table FailedAttempt
+				insert into FailedAttempt (MemberID, ActionDate) values ((select MemberID from Member where LastName = 'Doe'), GetDate())
+				insert into FailedAttempt (MemberID, ActionDate) values ((select MemberID from Member where LastName = 'Doe'), GetDate())
+				insert into FailedAttempt (MemberID, ActionDate) values ((select MemberID from Member where LastName = 'Doe'), GetDate())
+				insert into FailedAttempt (MemberID, ActionDate) values ((select MemberID from Member where LastName = 'Doe'), GetDate())
+			]]></sql>
+			<asserts>
+				<assert name="rownum" type="Rownum" datatype="Int">1</assert>
+				<assert name="value" type="Value" datatype="Varchar">Locked</assert>
+			</asserts>
+		</testcase>
+		<testcase>
+			<name>6. Five fails - still locked</name>
+			<sql><![CDATA[ 
+				truncate table Member
+				insert into Member (FirstName, LastName, Country, City, Age, Status) values ('John', 'Doe', 'US', 'New York', 123, 'Active')
+
+				truncate table FailedAttempt
+				insert into FailedAttempt (MemberID, ActionDate) values ((select MemberID from Member where LastName = 'Doe'), GetDate())
+				insert into FailedAttempt (MemberID, ActionDate) values ((select MemberID from Member where LastName = 'Doe'), GetDate())
+				insert into FailedAttempt (MemberID, ActionDate) values ((select MemberID from Member where LastName = 'Doe'), GetDate())
+				insert into FailedAttempt (MemberID, ActionDate) values ((select MemberID from Member where LastName = 'Doe'), GetDate())
+				insert into FailedAttempt (MemberID, ActionDate) values ((select MemberID from Member where LastName = 'Doe'), GetDate())
+			]]></sql>
+			<asserts>
+				<assert name="rownum" type="Rownum" datatype="Int">1</assert>
+				<assert name="value" type="Value" datatype="Varchar">Locked</assert>
+			</asserts>
+		</testcase>
+	</testcases>
+</cydsqltest>
