@@ -6,13 +6,14 @@ using SqlTest;
 
 namespace CyDSqlTest
 {
-    public class Program
-    {
-        public static void Main(string[] args)
-        {
+	public class Program
+	{
+		public static void Main(string[] args)
+		{
 			Console.WriteLine("CyD Sql Unit Test, http://www.cydsoft.com");
 
-			if (args.Length == 0) {
+			if (args.Length == 0)
+			{
 				PrintHelp();
 				return;
 			}
@@ -31,8 +32,10 @@ namespace CyDSqlTest
 			"",
 		};
 
-		public static void PrintHelp() {
-			foreach(string line in help) {
+		public static void PrintHelp()
+		{
+			foreach (string line in help)
+			{
 				Console.WriteLine(line);
 			}
 		}

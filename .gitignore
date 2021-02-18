@@ -1,0 +1,6 @@
+.DS_Store
+.vs/*
+src/CyDSqlTest/bin/*
+src/CyDSqlTest/obj/*
+src/SqlTest/bin/*
+src/SqlTest/obj/*
